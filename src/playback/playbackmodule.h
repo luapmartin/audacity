@@ -7,6 +7,9 @@
 #include <memory>
 
 #include "modularity/imodulesetup.h"
+#include "modularity/ioc.h"
+#include "iglobalconfiguration.h"
+#include "io/ifilesystem.h"
 
 namespace au::playback {
 class PlaybackConfiguration;
@@ -33,6 +36,11 @@ private:
 
 class PlaybackContext : public muse::modularity::IContextSetup
 {
+#ifdef AU_PLAYBACK_JITTER_LOG
+    muse::GlobalInject<muse::IGlobalConfiguration> globalConfiguration;
+    muse::GlobalInject<muse::io::IFileSystem> fileSystem;
+#endif
+
 public:
     PlaybackContext(const muse::modularity::ContextPtr& ctx)
         : muse::modularity::IContextSetup(ctx) {}

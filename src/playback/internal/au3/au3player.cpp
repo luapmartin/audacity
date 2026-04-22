@@ -19,6 +19,8 @@
 #include "au3wrap/internal/wxtypes_convert.h"
 #include "au3wrap/au3types.h"
 
+#include "../playbackjitterlogger.h"
+
 #include <algorithm>
 
 using namespace au::playback;
@@ -28,10 +30,19 @@ Au3Player::Au3Player(const muse::modularity::ContextPtr& ctx)
     : muse::Contextable(ctx)
 {
     m_playbackStatus.ch.onReceive(this, [this](PlaybackStatus st) {
-        if (st == PlaybackStatus::Running) {
-            m_currentTarget.reset();
-            m_consumedSamplesSoFar = 0;
-            m_reachedEnd.val = false;
+        switch (st) {
+            case PlaybackStatus::Running:
+                AU_JITTER_LOG_EVENT(PlaybackJitterLogger::EventType::StateRunning);
+                m_currentTarget.reset();
+                m_consumedSamplesSoFar = 0;
+                m_reachedEnd.val = false;
+                break;
+            case PlaybackStatus::Paused:
+                AU_JITTER_LOG_EVENT(PlaybackJitterLogger::EventType::StatePaused);
+                break;
+            case PlaybackStatus::Stopped:
+                AU_JITTER_LOG_EVENT(PlaybackJitterLogger::EventType::StateStopped);
+                break;
         }
 
         if (st != PlaybackStatus::Stopped) {
@@ -494,12 +505,14 @@ void Au3Player::updatePlaybackState()
             m_playbackStatus.set(PlaybackStatus::Stopped);
         } else if (m_timer.isActive()) {
             // Stream ended while not in playback mode (e.g., recording finished)
+            AU_JITTER_LOG_EVENT(PlaybackJitterLogger::EventType::TimerStopInactive);
             m_timer.stop();
         }
     } else if (m_playbackStatus.val == PlaybackStatus::Stopped
                && m_timer.isActive() && AudioIO::Get()->IsCapturing()) {
         // Recording has started after lead-in pre-roll — stop the playback timer
         // to avoid conflicting with the recording system's playhead updates
+        AU_JITTER_LOG_EVENT(PlaybackJitterLogger::EventType::TimerStopRecording);
         m_timer.stop();
     }
 }
@@ -514,6 +527,7 @@ void Au3Player::updatePlaybackPosition()
     using namespace std::chrono;
 
     const double sampleRate = audioEngine()->getPlaybackSampleRate();
+    AU_JITTER_LOG_SAMPLE_RATE(sampleRate);
 
     while (const auto callbackInfo = audioEngine()->consumeNextCallbackInfo()) {
         const auto targetConsumedSamples = static_cast<unsigned long long>(callbackInfo->numSamples)
@@ -530,6 +544,16 @@ void Au3Player::updatePlaybackPosition()
         const auto targetTime = dacTime + payloadDuration;
         m_currentTarget.emplace(targetTime, targetConsumedSamples);
     }
+
+#ifdef AU_PLAYBACK_JITTER_LOG
+    {
+        const int64_t dacNs = m_currentTarget.has_value()
+                              ? duration_cast<nanoseconds>(m_currentTarget->time.time_since_epoch()).count()
+                              : PlaybackJitterLogger::kDacSentinel;
+        const uint64_t consumed = m_currentTarget.has_value() ? m_currentTarget->consumedSamples : 0;
+        AU_JITTER_LOG_TICK(dacNs, consumed);
+    }
+#endif
 
     if (!m_currentTarget.has_value()) {
         return;

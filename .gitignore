@@ -227,6 +227,7 @@ build.qt5
 mscore/revision.h
 local_build_revision.env
 .DS_Store
+tools/perflog/.venv/
 CMakeLists.txt.user.*
 *.qmlc
 *.jsc

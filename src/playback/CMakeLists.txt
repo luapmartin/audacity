@@ -4,6 +4,8 @@
 
 declare_module(playback)
 
+option(AU_PLAYBACK_JITTER_LOG "Record a per-tick jitter log of the 16 ms playback timer and flush it at shutdown (diagnostic)" ON)
+
 set(MODULE_QRC playback.qrc)
 set(MODULE_QML_IMPORT ${CMAKE_CURRENT_LIST_DIR}/qml)
 
@@ -30,6 +32,8 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/internal/playbackmetercontroller.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/playbackuiactions.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/playbackuiactions.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/playbackjitterlogger.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/playbackjitterlogger.h
 
     ${CMAKE_CURRENT_LIST_DIR}/internal/au3/au3playback.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/au3/au3playback.h
@@ -81,6 +85,10 @@ set(MODULE_DEF ${AU3_DEF})
 set(MODULE_LINK au3wrap uicomponents)
 
 set(MODULE_USE_UNITY OFF)
+
+if(AU_PLAYBACK_JITTER_LOG)
+    set(MODULE_DEF ${MODULE_DEF} -DAU_PLAYBACK_JITTER_LOG)
+endif()
 
 setup_module()
 

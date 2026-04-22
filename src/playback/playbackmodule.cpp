@@ -6,13 +6,17 @@
 #include <QtQml>
 
 #include "framework/interactive/iinteractiveuriregister.h"
+#include "framework/global/log.h"
 
 #include "internal/playbackconfiguration.h"
 #include "internal/playbackcontroller.h"
 #include "internal/playbackmetercontroller.h"
 #include "internal/playbackuiactions.h"
+#include "internal/playbackjitterlogger.h"
 #include "internal/au3/au3playback.h"
 #include "internal/au3/au3trackplaybackcontrol.h"
+
+#include <QDateTime>
 
 #include "view/common/playbackstatemodel.h"
 #include "view/common/playbackmetermodel.h"
@@ -129,5 +133,18 @@ void PlaybackContext::onInit(const IApplication::RunMode& mode)
 
 void PlaybackContext::onDeinit()
 {
+#ifdef AU_PLAYBACK_JITTER_LOG
+    const io::path_t dir = globalConfiguration()->userAppDataPath() + "/perf_logs";
+    fileSystem()->makePath(dir);
+    const io::path_t path = dir + "/playback_jitter_"
+                            + QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss")
+                            + ".log";
+    const muse::Ret ret = PlaybackJitterLogger::instance().flush(path);
+    if (ret) {
+        LOGI() << "playback jitter log written: " << path;
+    } else {
+        LOGW() << "failed to write playback jitter log: " << path;
+    }
+#endif
     m_controller->deinit();
 }
