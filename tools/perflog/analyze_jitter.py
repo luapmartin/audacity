@@ -30,6 +30,9 @@ import numpy as np
 
 TARGET_MS = 16.0
 POSITION_UPDATE = "POSITION_UPDATE"
+# Events that halt the QTimer — IAT must be reset across these so we don't
+# count the idle gap until the next play as a jitter outlier.
+TIMER_HALT_EVENTS = {"STATE_STOPPED", "TIMER_STOP_INACTIVE", "TIMER_STOP_RECORDING"}
 EVENT_COLORS = {
     "STATE_RUNNING":        "#2ca02c",
     "STATE_PAUSED":         "#ff7f0e",
@@ -59,16 +62,23 @@ class LogData:
 
 
 def _default_log_path() -> Optional[str]:
-    """Guess the platform-specific perf_logs dir and return the newest log."""
+    """Find the newest playback_jitter_*.log under a platform app-data root.
+
+    The per-build subdir name varies (Audacity4, Audacity4Development, etc.),
+    so we glob under the app-data root rather than hard-coding the subdir.
+    """
     home = os.path.expanduser("~")
-    candidates = [
-        os.path.join(home, "Library/Application Support/Audacity4/perf_logs"),
-        os.path.join(home, ".config/Audacity4/perf_logs"),
-        os.path.join(home, "AppData/Roaming/Audacity/Audacity4/perf_logs"),
+    roots = [
+        os.path.join(home, "Library/Application Support"),
+        os.path.join(home, ".config"),
+        os.path.join(home, "AppData/Roaming"),
     ]
     newest = None
-    for d in candidates:
-        for f in glob.glob(os.path.join(d, "playback_jitter_*.log")):
+    for root in roots:
+        if not os.path.isdir(root):
+            continue
+        pattern = os.path.join(root, "**", "perf_logs", "playback_jitter_*.log")
+        for f in glob.glob(pattern, recursive=True):
             if newest is None or os.path.getmtime(f) > os.path.getmtime(newest):
                 newest = f
     return newest
@@ -123,6 +133,35 @@ def parse_log(path: str) -> LogData:
     )
 
 
+def compute_iats(data: LogData) -> tuple:
+    """Walk events in order; emit (t_ns, delta_ms) pairs within each timer run.
+
+    A "timer run" is the stretch of POSITION_UPDATE entries between
+    successive timer-halting events (STATE_STOPPED and the two TIMER_STOP_*).
+    Deltas that would straddle a halt are skipped, because the gap is just
+    idle time, not jitter.
+    """
+    t_of_pair: List[int] = []
+    deltas: List[float] = []
+    last_pos_wall: Optional[int] = None
+
+    for w, e in zip(data.wall_ns, data.events):
+        if e in TIMER_HALT_EVENTS:
+            last_pos_wall = None
+            continue
+        if e != POSITION_UPDATE:
+            continue
+        if last_pos_wall is not None:
+            t_of_pair.append(int(w))
+            deltas.append((int(w) - last_pos_wall) / 1e6)
+        last_pos_wall = int(w)
+
+    return (
+        np.asarray(t_of_pair, dtype=np.int64),
+        np.asarray(deltas, dtype=np.float64),
+    )
+
+
 def _print_summary(deltas_ms: np.ndarray, header: Header) -> None:
     if len(deltas_ms) == 0:
         print("no POSITION_UPDATE deltas found")
@@ -132,9 +171,9 @@ def _print_summary(deltas_ms: np.ndarray, header: Header) -> None:
     p99 = np.percentile(deltas_ms, 99)
     outliers = int(np.sum(deltas_ms > TARGET_MS * 1.5))
     print(f"session start: {header.system_start_iso}  sample_rate={header.sample_rate:.1f} Hz")
-    print(f"POSITION_UPDATE count: {len(deltas_ms) + 1}"
+    print(f"IAT pairs (within-run): {len(deltas_ms)}"
           f"   overflowed={header.overflowed}   total_entries={header.total_entries}")
-    print(f"inter-arrival ms:")
+    print(f"inter-arrival ms (reset on stop):")
     print(f"  mean={np.mean(deltas_ms):6.3f}  min={np.min(deltas_ms):6.3f}"
           f"  p50={p50:6.3f}  p95={p95:6.3f}  p99={p99:6.3f}  max={np.max(deltas_ms):6.3f}")
     print(f"  outliers > {TARGET_MS * 1.5:.1f} ms: {outliers} "
@@ -162,17 +201,17 @@ def _plot_histogram(deltas_ms: np.ndarray, bins: int, out_path: str) -> None:
     plt.close(fig)
 
 
-def _plot_timeline(data: LogData, out_path: str) -> None:
+def _plot_timeline(data: LogData, pair_t_ns: np.ndarray, deltas_ms: np.ndarray,
+                   out_path: str) -> None:
     pos_mask = data.events == POSITION_UPDATE
     pos_wall = data.wall_ns[pos_mask]
-    if len(pos_wall) < 2:
+    if len(pos_wall) < 2 or len(deltas_ms) == 0:
         return
     t0 = pos_wall[0]
-    t_sec = (pos_wall - t0) / 1e9
-    deltas_ms = np.diff(pos_wall) / 1e6
+    t_sec = (pair_t_ns - t0) / 1e9
 
     fig, ax = plt.subplots(figsize=(14, 5))
-    ax.scatter(t_sec[1:], deltas_ms, s=4, alpha=0.6, color="#1f77b4",
+    ax.scatter(t_sec, deltas_ms, s=4, alpha=0.6, color="#1f77b4",
                label="POSITION_UPDATE delta")
     ax.axhline(TARGET_MS, color="red", linestyle="--", linewidth=1, label="16 ms target")
 
@@ -187,8 +226,8 @@ def _plot_timeline(data: LogData, out_path: str) -> None:
 
     ax.set_xlabel("session time (s)")
     ax.set_ylabel("tick delta (ms)")
-    ax.set_title("Jitter over time with transport events")
-    ax.set_ylim(bottom=0, top=max(TARGET_MS * 4, float(np.percentile(deltas_ms, 99.5)) * 1.1))
+    ax.set_title("Jitter over time with transport events (IAT reset on stop)")
+    ax.set_ylim(bottom=0, top=max(TARGET_MS * 4, float(np.max(deltas_ms) * 1.1)))
     ax.legend(loc="upper right", ncol=2, fontsize=8)
     fig.tight_layout()
     fig.savefig(out_path, dpi=120)
@@ -233,13 +272,11 @@ def main(argv=None) -> int:
 
     data = parse_log(log_path)
 
-    pos_mask = data.events == POSITION_UPDATE
-    pos_wall = data.wall_ns[pos_mask]
-    if len(pos_wall) < 2:
-        print("fewer than 2 POSITION_UPDATE entries — nothing to analyze.", file=sys.stderr)
+    pair_t_ns, deltas_ms = compute_iats(data)
+    if len(deltas_ms) == 0:
+        print("no valid POSITION_UPDATE pairs found (after segmenting on stop events).",
+              file=sys.stderr)
         return 1
-
-    deltas_ms = np.diff(pos_wall) / 1e6
 
     out_dir = args.out_dir or os.path.join(
         os.path.dirname(log_path),
@@ -249,7 +286,7 @@ def main(argv=None) -> int:
 
     _print_summary(deltas_ms, data.header)
     _plot_histogram(deltas_ms, args.bins, os.path.join(out_dir, "histogram.png"))
-    _plot_timeline(data, os.path.join(out_dir, "timeline.png"))
+    _plot_timeline(data, pair_t_ns, deltas_ms, os.path.join(out_dir, "timeline.png"))
     _plot_dac_drift(data, os.path.join(out_dir, "dac_drift.png"))
 
     print(f"\nplots written to: {out_dir}")
