@@ -70,6 +70,21 @@ set(AU4_BUILD_MODE "dev" CACHE STRING "Build mode")
 
 set(AU4_REVISION "" CACHE STRING "Build revision")
 
+###########################################
+# Diagnostic options
+###########################################
+if(APPLE)
+    option(AU_APPLE_SIGNPOSTS "Emit os_signpost events for Apple Instruments (diagnostic)" ON)
+else()
+    option(AU_APPLE_SIGNPOSTS "Emit os_signpost events (Apple only)" OFF)
+endif()
+
+if(AU_APPLE_SIGNPOSTS AND APPLE)
+    add_compile_definitions(AU_APPLE_SIGNPOSTS)
+endif()
+
+include_directories(${CMAKE_SOURCE_DIR}/src/common/diagnostics)
+
 set(MUSE_ENABLE_UNIT_TESTS ON)
 set(MUSE_MODULE_ACCESSIBILITY ON)
 set(MUSE_MODULE_ACTIONS ON)
