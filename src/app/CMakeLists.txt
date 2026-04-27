@@ -163,6 +163,8 @@ qt_add_executable(${EXECUTABLE_NAME}
     pluginregistrationapp.h
     commandlineparser.cpp
     commandlineparser.h
+    ${CMAKE_SOURCE_DIR}/src/common/diagnostics/mainthreadwatchdog.cpp
+    ${CMAKE_SOURCE_DIR}/src/common/diagnostics/mainthreadwatchdog.h
 )
 
 ###########################################

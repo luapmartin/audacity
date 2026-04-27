@@ -21,6 +21,12 @@
 #include "ausignposts.h"
 #endif
 
+#ifdef AU_MAIN_THREAD_WATCHDOG
+#include <QTimer>
+#include "global/iglobalconfiguration.h"
+#include "mainthreadwatchdog.h"
+#endif
+
 using namespace muse;
 using namespace au::app;
 using namespace au::appshell;
@@ -106,6 +112,38 @@ void GuiApp::doStartupScenario(const muse::modularity::ContextPtr& ctxId)
         }
         startupScenario->runAfterSplashScreen();
     }, Qt::QueuedConnection);
+
+#ifdef AU_MAIN_THREAD_WATCHDOG
+    // Diagnostic: start a background watchdog that detects main-thread stalls.
+    // On detection it emits an os_signpost event and runs `sample(1)` to dump
+    // the backtrace of every thread into <userAppData>/stall_samples/.
+    {
+        auto globalCfg = muse::modularity::globalIoc()->resolve<muse::IGlobalConfiguration>("global");
+        const std::string sampleDir = globalCfg
+                                      ? (globalCfg->userAppDataPath() + "/stall_samples").toStdString()
+                                      : std::string("/tmp/au_stall_samples");
+
+        au::diag::MainThreadWatchdog::instance().start(
+            std::chrono::milliseconds { 500 },
+            std::chrono::milliseconds { 100 },
+            sampleDir);
+
+        // Heartbeat on the main thread: a 100 ms QTimer that records a beat
+        // on every fire. If the event loop stalls, beats stop arriving and
+        // the watchdog fires. QTimer outlives GuiApp (owned by qApp).
+        static QTimer* s_heartbeat = nullptr;
+        if (!s_heartbeat) {
+            s_heartbeat = new QTimer(qApp);
+            s_heartbeat->setInterval(100);
+            QObject::connect(s_heartbeat, &QTimer::timeout, qApp, []() {
+                au::diag::MainThreadWatchdog::instance().beat();
+            });
+            s_heartbeat->start();
+            LOGI() << "AU_MAIN_THREAD_WATCHDOG: started (500 ms threshold, 100 ms checks)"
+                   << ", sample dumps -> " << sampleDir;
+        }
+    }
+#endif
 
 #ifdef AU_FORCE_QML_GC
     // Diagnostic: force QML/JS garbage collection every second to test whether

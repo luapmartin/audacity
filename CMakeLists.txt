@@ -93,6 +93,11 @@ if(AU_FORCE_QML_GC)
     add_compile_definitions(AU_FORCE_QML_GC)
 endif()
 
+option(AU_MAIN_THREAD_WATCHDOG "Background std::thread that detects main-thread stalls (>500 ms default), emits an os_signpost event and runs `sample(1)` to dump backtraces to disk" ON)
+if(AU_MAIN_THREAD_WATCHDOG)
+    add_compile_definitions(AU_MAIN_THREAD_WATCHDOG)
+endif()
+
 include_directories(${CMAKE_SOURCE_DIR}/src/common/diagnostics)
 
 set(MUSE_ENABLE_UNIT_TESTS ON)
