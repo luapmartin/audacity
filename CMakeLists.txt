@@ -88,6 +88,11 @@ if(AU_DISABLE_METER_SIGNALS)
     add_compile_definitions(AU_DISABLE_METER_SIGNALS)
 endif()
 
+option(AU_FORCE_QML_GC "Force QML/JS engine collectGarbage() on a 1 s QTimer (A/B diagnostic — tests the GC-pause hypothesis)" OFF)
+if(AU_FORCE_QML_GC)
+    add_compile_definitions(AU_FORCE_QML_GC)
+endif()
+
 include_directories(${CMAKE_SOURCE_DIR}/src/common/diagnostics)
 
 set(MUSE_ENABLE_UNIT_TESTS ON)

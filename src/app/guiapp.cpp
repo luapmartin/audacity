@@ -14,6 +14,13 @@
 
 #include "log.h"
 
+#ifdef AU_FORCE_QML_GC
+#include <QTimer>
+#include <QQmlApplicationEngine>
+#include "ui/iuiengine.h"
+#include "ausignposts.h"
+#endif
+
 using namespace muse;
 using namespace au::app;
 using namespace au::appshell;
@@ -99,6 +106,29 @@ void GuiApp::doStartupScenario(const muse::modularity::ContextPtr& ctxId)
         }
         startupScenario->runAfterSplashScreen();
     }, Qt::QueuedConnection);
+
+#ifdef AU_FORCE_QML_GC
+    // Diagnostic: force QML/JS garbage collection every second to test whether
+    // long main-thread freezes are driven by ad-hoc GC pauses.
+    auto uiengine = muse::modularity::ioc(ctxId)->resolve<muse::ui::IUiEngine>("app");
+    if (uiengine && uiengine->qmlAppEngine()) {
+        QQmlApplicationEngine* qmlEngine = uiengine->qmlAppEngine();
+        static QTimer* s_gcTimer = nullptr;
+        if (!s_gcTimer) {
+            s_gcTimer = new QTimer(qApp);
+            s_gcTimer->setInterval(1000);
+            QObject::connect(s_gcTimer, &QTimer::timeout, qApp, [qmlEngine]() {
+                AU_SP_SCOPE("forceQmlGC");
+                LOGI() << "AU_FORCE_QML_GC: calling collectGarbage()";
+                qmlEngine->collectGarbage();
+            });
+            s_gcTimer->start();
+            LOGI() << "AU_FORCE_QML_GC: started 1 s force-GC timer";
+        }
+    } else {
+        LOGW() << "AU_FORCE_QML_GC: IUiEngine not resolvable; GC timer not started";
+    }
+#endif
 }
 
 void GuiApp::applyCommandLineOptions(const std::shared_ptr<muse::CmdOptions>& opt)
