@@ -83,6 +83,11 @@ if(AU_APPLE_SIGNPOSTS AND APPLE)
     add_compile_definitions(AU_APPLE_SIGNPOSTS)
 endif()
 
+option(AU_DISABLE_METER_SIGNALS "Disable all meter signal fan-out (A/B diagnostic — UI meters stop updating)" OFF)
+if(AU_DISABLE_METER_SIGNALS)
+    add_compile_definitions(AU_DISABLE_METER_SIGNALS)
+endif()
+
 include_directories(${CMAKE_SOURCE_DIR}/src/common/diagnostics)
 
 set(MUSE_ENABLE_UNIT_TESTS ON)

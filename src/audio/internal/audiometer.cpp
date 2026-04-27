@@ -81,6 +81,7 @@ AudioMeter::AudioMeter(std::unique_ptr<ITimer> playingTimer, std::unique_ptr<ITi
             m_mainThreadQueue.pop();
         }
 
+#ifndef AU_DISABLE_METER_SIGNALS
         for (std::pair<const TrackId, TrackData>& entry : m_trackData) {
             auto& trackData = entry.second;
             for (const std::pair<const audioch_t, Levels>& entry : trackData.channelLevels) {
@@ -90,6 +91,7 @@ AudioMeter::AudioMeter(std::unique_ptr<ITimer> playingTimer, std::unique_ptr<ITi
                         { muse::db_to_linear(levels.rms.db), levels.rms.db } });
             }
         }
+#endif
     });
 }
 
