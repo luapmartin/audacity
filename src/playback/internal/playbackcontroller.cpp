@@ -4,6 +4,7 @@
 #include "playbackcontroller.h"
 #include "playbackuiactions.h"
 #include "../playbacktypes.h"
+#include "ausignposts.h"
 
 using namespace muse;
 using namespace au::audio;
@@ -270,6 +271,7 @@ void PlaybackController::onProjectChanged()
 
 void PlaybackController::onPlaybackPositionChanged()
 {
+    AU_SP_SCOPE("onPlaybackPositionChanged");
     if (isPlaybackPositionOnTheEndOfProject() || isPlaybackPositionOnTheEndOfPlaybackRegion()) {
         //! NOTE: just stop, without seek
         player()->stop();
@@ -282,6 +284,7 @@ void PlaybackController::onPlaybackPositionChanged()
 
 void PlaybackController::togglePlayAction()
 {
+    AU_SP_EVENT("togglePlayAction");
     if (!isPlayAllowed()) {
         LOGW() << "playback not allowed";
         return;
@@ -462,6 +465,7 @@ void PlaybackController::doChangePlaybackRegion(const PlaybackRegion& region)
 
 void PlaybackController::pauseAction()
 {
+    AU_SP_EVENT("pauseAction");
     doPause();
 }
 
@@ -482,6 +486,7 @@ void PlaybackController::doPause()
 
 void PlaybackController::stopAction()
 {
+    AU_SP_EVENT("stopAction");
     stopSeekAndUpdatePlaybackRegion();
 }
 

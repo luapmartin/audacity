@@ -10,6 +10,8 @@
 #include "playback/playbacktypes.h"
 #include "playback/iaudiooutput.h"
 
+#include "ausignposts.h"
+
 using namespace au::projectscene;
 using namespace au::trackedit;
 using namespace au::audio;
@@ -42,12 +44,14 @@ void WaveTrackItem::init(const trackedit::Track& track)
 
     playback()->audioOutput()->playbackTrackSignalChanges(trackId())
     .onReceive(this, [this](audio::audioch_t channel, const au::audio::MeterSignal& meterSignal) {
+        AU_SP_SCOPE("trackMeter.playbackSignalIn");
         setAudioChannelVolumePressure(channel, meterSignal.peak.pressure);
         setAudioChannelRMS(channel, meterSignal.rms.pressure);
     }, muse::async::Asyncable::Mode::SetReplace);
 
     record()->audioInput()->recordTrackSignalChanges(trackId())
     .onReceive(this, [this](audio::audioch_t channel, const au::audio::MeterSignal& meterSignal) {
+        AU_SP_SCOPE("trackMeter.recordSignalIn");
         setAudioChannelVolumePressure(channel, meterSignal.peak.pressure);
         setAudioChannelRMS(channel, meterSignal.rms.pressure);
     }, muse::async::Asyncable::Mode::SetReplace);
@@ -188,6 +192,7 @@ void WaveTrackItem::setLeftChannelPressure(float leftChannelPressure)
         return;
     }
 
+    AU_SP_SCOPE("trackMeter.emitLeftPressure");
     m_leftChannelPressure = leftChannelPressure;
     emit leftChannelPressureChanged(m_leftChannelPressure);
 }
@@ -198,6 +203,7 @@ void WaveTrackItem::setRightChannelPressure(float rightChannelPressure)
         return;
     }
 
+    AU_SP_SCOPE("trackMeter.emitRightPressure");
     m_rightChannelPressure = rightChannelPressure;
     emit rightChannelPressureChanged(m_rightChannelPressure);
 }
@@ -208,6 +214,7 @@ void WaveTrackItem::setLeftChannelRMS(float leftChannelRMS)
         return;
     }
 
+    AU_SP_SCOPE("trackMeter.emitLeftRMS");
     m_leftChannelRMS = leftChannelRMS;
     emit leftChannelRMSChanged(m_leftChannelRMS);
 }
@@ -218,6 +225,7 @@ void WaveTrackItem::setRightChannelRMS(float rightChannelRMS)
         return;
     }
 
+    AU_SP_SCOPE("trackMeter.emitRightRMS");
     m_rightChannelRMS = rightChannelRMS;
     emit rightChannelRMSChanged(m_rightChannelRMS);
 }
@@ -285,6 +293,7 @@ void WaveTrackItem::checkMainAudioInput()
     if (isFocused() && m_recordStreamChannelsMatch) {
         record()->audioInput()->recordSignalChanges().onReceive(this,
                                                                 [this](const audioch_t audioChNum, const audio::MeterSignal& meterSignal) {
+            AU_SP_SCOPE("trackMeter.mainInputSignalIn");
             setAudioChannelVolumePressure(audioChNum,
                                           meterSignal.peak.pressure);
             setAudioChannelRMS(audioChNum, meterSignal.rms.pressure);

@@ -1,6 +1,7 @@
 #include "playbackmeterpanelmodel.h"
 
 #include "playback/playbacktypes.h"
+#include "ausignposts.h"
 
 using namespace au::playback;
 
@@ -18,6 +19,7 @@ void PlaybackMeterPanelModel::init()
     playback()->audioOutput()->playbackSignalChanges().onReceive(this,
                                                                  [this](const trackedit::audioch_t audioChNum,
                                                                         const audio::MeterSignal& meterSignal) {
+        AU_SP_SCOPE("masterMeter.signalIn");
         setAudioChannelVolumePressure(audioChNum, meterSignal.peak.pressure);
         setAudioChannelRMS(audioChNum, meterSignal.rms.pressure);
     });
@@ -63,6 +65,7 @@ void PlaybackMeterPanelModel::setLeftChannelPressure(float leftChannelPressure)
         return;
     }
 
+    AU_SP_SCOPE("masterMeter.emitLeftPressure");
     m_leftChannelPressure = leftChannelPressure;
     emit leftChannelPressureChanged(m_leftChannelPressure);
 }
@@ -73,6 +76,7 @@ void PlaybackMeterPanelModel::setRightChannelPressure(float rightChannelPressure
         return;
     }
 
+    AU_SP_SCOPE("masterMeter.emitRightPressure");
     m_rightChannelPressure = rightChannelPressure;
     emit rightChannelPressureChanged(m_rightChannelPressure);
 }
@@ -106,6 +110,7 @@ void PlaybackMeterPanelModel::setLeftChannelRMS(float leftChannelRMS)
         return;
     }
 
+    AU_SP_SCOPE("masterMeter.emitLeftRMS");
     m_leftChannelRMS = leftChannelRMS;
     emit leftChannelRMSChanged(m_leftChannelRMS);
 }
@@ -121,6 +126,7 @@ void PlaybackMeterPanelModel::setRightChannelRMS(float rightChannelRMS)
         return;
     }
 
+    AU_SP_SCOPE("masterMeter.emitRightRMS");
     m_rightChannelRMS = rightChannelRMS;
     emit rightChannelRMSChanged(m_rightChannelRMS);
 }

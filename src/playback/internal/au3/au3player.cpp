@@ -20,6 +20,7 @@
 #include "au3wrap/au3types.h"
 
 #include "../playbackjitterlogger.h"
+#include "ausignposts.h"
 
 #include <algorithm>
 
@@ -33,15 +34,18 @@ Au3Player::Au3Player(const muse::modularity::ContextPtr& ctx)
         switch (st) {
             case PlaybackStatus::Running:
                 AU_JITTER_LOG_EVENT(PlaybackJitterLogger::EventType::StateRunning);
+                AU_SP_EVENT("stateRunning");
                 m_currentTarget.reset();
                 m_consumedSamplesSoFar = 0;
                 m_reachedEnd.val = false;
                 break;
             case PlaybackStatus::Paused:
                 AU_JITTER_LOG_EVENT(PlaybackJitterLogger::EventType::StatePaused);
+                AU_SP_EVENT("statePaused");
                 break;
             case PlaybackStatus::Stopped:
                 AU_JITTER_LOG_EVENT(PlaybackJitterLogger::EventType::StateStopped);
+                AU_SP_EVENT("stateStopped");
                 break;
         }
 
@@ -84,6 +88,7 @@ bool Au3Player::isBusy() const
 
 void Au3Player::play()
 {
+    AU_SP_SCOPE("Au3Player::play");
     if (m_playbackStatus.val == PlaybackStatus::Paused) {
         audioEngine()->pauseStream(false);
         m_playbackStatus.set(PlaybackStatus::Running);
@@ -213,6 +218,7 @@ muse::Ret Au3Player::playTracks(TrackList& trackList, double startTime, double e
 
 muse::Ret Au3Player::doPlayTracks(TrackList& trackList, double startTime, double endTime, const PlayTracksOptions& options)
 {
+    AU_SP_SCOPE("Au3Player::doPlayTracks");
     TransportSequences seqs = makeTransportTracks(trackList, options.selectedOnly);
 
     double mixerEndTime = options.mixerEndTime;
@@ -272,6 +278,7 @@ void Au3Player::rewind()
 
 void Au3Player::stop()
 {
+    AU_SP_SCOPE("Au3Player::stop");
     if (m_playbackStatus.val == PlaybackStatus::Stopped) {
         return;
     }
@@ -304,6 +311,7 @@ void Au3Player::stop()
 
 void Au3Player::pause()
 {
+    AU_SP_SCOPE("Au3Player::pause");
     if (!canStopAudioStream()) {
         return;
     }
@@ -314,6 +322,7 @@ void Au3Player::pause()
 
 void Au3Player::resume()
 {
+    AU_SP_SCOPE("Au3Player::resume");
     if (!canStopAudioStream()) {
         return;
     }
@@ -491,6 +500,7 @@ muse::async::Notification Au3Player::loopRegionChanged() const
 
 void Au3Player::updatePlaybackState()
 {
+    AU_SP_SCOPE("updatePlaybackState");
     int token = ProjectAudioIO::Get(projectRef()).GetAudioIOToken();
     bool isActive = AudioIO::Get()->IsStreamActive(token);
     const double time = std::max(0.0, AudioIO::Get()->GetStreamTime() + m_startOffset);
@@ -524,6 +534,7 @@ muse::secs_t Au3Player::playbackPosition() const
 
 void Au3Player::updatePlaybackPosition()
 {
+    AU_SP_SCOPE("updatePlaybackPosition");
     using namespace std::chrono;
 
     const double sampleRate = audioEngine()->getPlaybackSampleRate();

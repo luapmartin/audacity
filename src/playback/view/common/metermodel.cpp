@@ -4,6 +4,8 @@
 
 #include "metermodel.h"
 
+#include "ausignposts.h"
+
 #include <memory>
 
 using namespace au::playback;
@@ -76,6 +78,7 @@ QString MeterModel::sampleToText(double sample) const
 
 QVariantList MeterModel::fullSteps() const
 {
+    AU_SP_SCOPE("MeterModel::fullSteps");
     QVariantList steps;
     for (const auto& step : meterController()->fullSteps(m_meterSize)) {
         steps.append(step);
@@ -86,6 +89,7 @@ QVariantList MeterModel::fullSteps() const
 
 QVariantList MeterModel::smallSteps() const
 {
+    AU_SP_SCOPE("MeterModel::smallSteps");
     QVariantList steps;
     for (const auto& step : meterController()->smallSteps(m_meterSize)) {
         steps.append(step);
@@ -142,6 +146,7 @@ void MeterModel::setMeterSize(int size)
         return;
     }
 
+    AU_SP_SCOPE("MeterModel::setMeterSize");
     m_meterSize = size;
     emit smallStepsChanged();
     emit fullStepsChanged();
